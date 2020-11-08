@@ -1,9 +1,9 @@
 SamplerBox
 ==========
 
-An open-source audio sampler project based on RaspberryPi.
+Fork of an open-source audio sampler project based on RaspberryPi.
 
-Website: www.samplerbox.org
+Original project see on website: www.samplerbox.org
 
 [![](http://gget.it/flurexml/1.jpg)](https://www.youtube.com/watch?v=yz7GZ8YOjTw)
 
@@ -19,16 +19,23 @@ SamplerBox works with the RaspberryPi's built-in soundcard, but it is recommende
   sudo pip install rtmidi-python pyaudio cffi sounddevice
   ~~~
 
-2. Download SamplerBox and build it with: 
+   Specific to setting up on Orang Pi Zero using `Armbian 20.08.17 Bionic` with `Linux 5.4.72-sunxi`
 
   ~~~
-  git clone https://github.com/josephernest/SamplerBox.git
-  cd SamplerBox ; sudo python setup.py build_ext --inplace
+  sudo apt-get insatll python3-numpy libffi-dev libportaudio2 libasound2-dev alsa-base alsa-oss alsa-utils pkg-config
+  sudo pip3 install soudndevice rtmidi-python cython
   ~~~
 
-3. Run the soft with `python samplerbox.py`.
+2. Download SamplerBox and build it with:
 
-4. Play some notes on the connected MIDI keyboard, you'll hear some sound!  
+  ~~~
+  git clone https://github.com/zero-emission/SamplerBox.git
+  cd SamplerBox ; sudo python3 setup.py build_ext --inplace
+  ~~~
+
+3. Run the soft with `python3 samplerbox.py`.
+
+4. Play some notes on the connected MIDI keyboard, you'll hear some sound!
 
 *(Optional)*  Modify `samplerbox.py`'s first lines if you want to change root directory for sample-sets, default soundcard, etc.
 
