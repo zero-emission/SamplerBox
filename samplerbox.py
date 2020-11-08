@@ -15,15 +15,16 @@
 #########################################
 
 AUDIO_DEVICE_ID = 0                     # change this number to use another soundcard
-SAMPLES_DIR = "."                       # The root directory containing the sample-sets. Example: "/media/" to look for samples on a USB stick / SD card
+SAMPLES_DIR = "/home/d1v1n/usb_storage/"# The root directory containing the sample-sets. Example: "/media/" to look for samples on a USB stick / SD card
 USE_SERIALPORT_MIDI = False             # Set to True to enable MIDI IN via SerialPort (e.g. RaspberryPi's GPIO UART pins)
 USE_I2C_7SEGMENTDISPLAY = False         # Set to True to use a 7-segment display via I2C
-USE_BUTTONS = False                     # Set to True to use momentary buttons (connected to RaspberryPi's GPIO pins) to change preset
+USE_BUTTONS = True                      # Set to True to use momentary buttons (connected to RaspberryPi's GPIO pins) to change preset
 MAX_POLYPHONY = 80                      # This can be set higher, but 80 is a safe value
 USE_I2C_SH1106OLED = True
 BTN1 = 'PG7'
 BTN2 = 'PG6'
 OPIZ = True
+FONT_PATH = './font.ttf'
 
 #########################################
 # IMPORT
@@ -41,7 +42,6 @@ from chunk import Chunk
 import struct
 import rtmidi_python as rtmidi
 import samplerbox_audio
-
 
 #########################################
 # SLIGHT MODIFICATION OF PYTHON'S WAVE MODULE
@@ -276,11 +276,11 @@ def ActuallyLoad():
     if basename:
         dirname = os.path.join(samplesdir, basename)
     if not basename:
-        print('Preset empty: %s' % preset)
-        display("E%03d" % preset)
+        print('Preset empty: {}'.format(str(preset)))
+        display('E{:03d}'.format(preset))
         return
-    print('Preset loading: %s (%s)' % (preset, basename))
-    display("L%03d" % preset)
+    print('Preset loading: {} ({})'.format(str(preset), str(basename)))
+    display('L{:03d}'.format(preset))
 
     definitionfname = os.path.join(dirname, "definition.txt")
     if os.path.isfile(definitionfname):
@@ -342,10 +342,10 @@ def ActuallyLoad():
                     pass
     if len(initial_keys) > 0:
         print('Preset loaded: ' + str(preset))
-        display("%04d" % preset)
+        display('{:04d}'.format(preset)) 
     else:
         print('Preset empty: ' + str(preset))
-        display("E%03d" % preset)
+        display('E{:03d}'.format(preset))
 
 
 #########################################
@@ -371,33 +371,39 @@ if USE_BUTTONS:
     
     if OPIZ:
         import OPi.GPIO as GPIO
+        GPIO.setmode(GPIO.SUNXI)
+        GPIO.setwarnings(False)
     else:
         import RPi.GPIO as GPIO
-
-    lastbuttontime = 0
-
-    def Buttons():
         GPIO.setmode(GPIO.BCM)
-        GPIO.setup(BTN1, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-        GPIO.setup(BTN2, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+        
+    GPIO.setup(BTN1, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+    GPIO.setup(BTN2, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+
+            
+    def Buttons():
+
         global preset, lastbuttontime
+        
         while True:
             now = time.time()
-            if not GPIO.input(BTN1) and (now - lastbuttontime) > 0.2:
+            if not GPIO.input(BTN1) and (now - lastbuttontime) > 0.5:
                 lastbuttontime = now
                 preset -= 1
                 if preset < 0:
                     preset = 127
                 LoadSamples()
+                #print('BTN1=',GPIO.input(BTN1))
 
-            elif not GPIO.input(BTN2) and (now - lastbuttontime) > 0.2:
+            elif not GPIO.input(BTN2) and (now - lastbuttontime) > 0.5:
                 lastbuttontime = now
                 preset += 1
                 if preset > 127:
                     preset = 0
                 LoadSamples()
+                #print('BTN2=',GPIO.input(BTN2))
 
-            time.sleep(0.020)
+            time.sleep(0.050)
 
     ButtonsThread = threading.Thread(target=Buttons)
     ButtonsThread.daemon = True
@@ -438,13 +444,16 @@ elif USE_I2C_SH1106OLED:
     from luma.core.interface.serial import i2c
     from luma.core.render import canvas
     from luma.oled.device import sh1106
+    from PIL import ImageFont
+    
+    font = ImageFont.truetype(FONT_PATH, 28)
     
     serial = i2c(port=0, address=0x3C)
     device = sh1106(serial)
     
     def display(s):
         with canvas(device) as draw:
-            draw.text((3, 3), s, fill="white")
+            draw.text((10, 10), s, font=font, fill="white")
 
     display('----')
     time.sleep(0.5)
