@@ -15,7 +15,7 @@
 #########################################
 
 AUDIO_DEVICE_ID = 0                     # change this number to use another soundcard
-SAMPLES_DIR = "/home/d1v1n/usb_storage/"# The root directory containing the sample-sets. Example: "/media/" to look for samples on a USB stick / SD card
+SAMPLES_DIR = "."                       # The root directory containing the sample-sets. Example: "/media/" to look for samples on a USB stick / SD card
 USE_SERIALPORT_MIDI = False             # Set to True to enable MIDI IN via SerialPort (e.g. RaspberryPi's GPIO UART pins)
 USE_I2C_7SEGMENTDISPLAY = False         # Set to True to use a 7-segment display via I2C
 USE_BUTTONS = True                      # Set to True to use momentary buttons (connected to RaspberryPi's GPIO pins) to change preset
@@ -26,6 +26,8 @@ BTN2 = 'PG6'
 OPIZ = True
 FONT_PATH = './font.ttf'
 
+lastbuttontime = 0
+preset = 0
 #########################################
 # IMPORT
 # MODULES
@@ -342,7 +344,7 @@ def ActuallyLoad():
                     pass
     if len(initial_keys) > 0:
         print('Preset loaded: ' + str(preset))
-        display('{:04d}'.format(preset)) 
+        display('{:04d}'.format(preset))
     else:
         print('Preset empty: ' + str(preset))
         display('E{:03d}'.format(preset))
@@ -368,7 +370,7 @@ except:
 #########################################
 
 if USE_BUTTONS:
-    
+
     if OPIZ:
         import OPi.GPIO as GPIO
         GPIO.setmode(GPIO.SUNXI)
@@ -376,15 +378,15 @@ if USE_BUTTONS:
     else:
         import RPi.GPIO as GPIO
         GPIO.setmode(GPIO.BCM)
-        
+
     GPIO.setup(BTN1, GPIO.IN, pull_up_down=GPIO.PUD_UP)
     GPIO.setup(BTN2, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
-            
+
     def Buttons():
 
         global preset, lastbuttontime
-        
+
         while True:
             now = time.time()
             if not GPIO.input(BTN1) and (now - lastbuttontime) > 0.5:
@@ -434,7 +436,7 @@ if USE_I2C_7SEGMENTDISPLAY:
     display('----')
     time.sleep(0.5)
 
-    
+
 #########################################
 # I2C SH1106 OLED Display
 #
@@ -445,12 +447,12 @@ elif USE_I2C_SH1106OLED:
     from luma.core.render import canvas
     from luma.oled.device import sh1106
     from PIL import ImageFont
-    
+
     font = ImageFont.truetype(FONT_PATH, 28)
-    
+
     serial = i2c(port=0, address=0x3C)
     device = sh1106(serial)
-    
+
     def display(s):
         with canvas(device) as draw:
             draw.text((10, 10), s, font=font, fill="white")
