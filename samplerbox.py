@@ -15,19 +15,22 @@
 #########################################
 
 AUDIO_DEVICE_ID = 0                     # change this number to use another soundcard
-SAMPLES_DIR = "."                       # The root directory containing the sample-sets. Example: "/media/" to look for samples on a USB stick / SD card
+SAMPLES_DIR = "/home/d1v1n/usb_storage/"# The root directory containing the sample-sets. Example: "/media/" to look for samples on a USB stick / SD card
 USE_SERIALPORT_MIDI = False             # Set to True to enable MIDI IN via SerialPort (e.g. RaspberryPi's GPIO UART pins)
 USE_I2C_7SEGMENTDISPLAY = False         # Set to True to use a 7-segment display via I2C
-USE_BUTTONS = True                      # Set to True to use momentary buttons (connected to RaspberryPi's GPIO pins) to change preset
-MAX_POLYPHONY = 80                      # This can be set higher, but 80 is a safe value
-USE_I2C_SH1106OLED = True
+USE_BUTTONS = False                     # Set to True to use momentary buttons (connected to RaspberryPi's GPIO pins) to change preset
 BTN1 = 'PG7'
 BTN2 = 'PG6'
+MAX_POLYPHONY = 80                      # This can be set higher, but 80 is a safe value
+USE_I2C_SH1106OLED = True
 OPIZ = True
 FONT_PATH = './font.ttf'
+USE_ENC = True
+encA = 'PG6'
+encB = 'PG7'
+encBtn = 'PA6'
+MIDI_CHAN = 5
 
-lastbuttontime = 0
-preset = 0
 #########################################
 # IMPORT
 # MODULES
@@ -197,43 +200,46 @@ def MidiCallback(message, time_stamp):
     global preset
     messagetype = message[0] >> 4
     messagechannel = (message[0] & 15) + 1
-    note = message[1] if len(message) > 1 else None
-    midinote = note
-    velocity = message[2] if len(message) > 2 else None
 
-    if messagetype == 9 and velocity == 0:
-        messagetype = 8
+    if messagechannel == MIDI_CHAN:
 
-    if messagetype == 9:    # Note on
-        midinote += globaltranspose
-        try:
-            playingnotes.setdefault(midinote, []).append(samples[midinote, velocity].play(midinote))
-        except:
-            pass
+        note = message[1] if len(message) > 1 else None
+        midinote = note
+        velocity = message[2] if len(message) > 2 else None
 
-    elif messagetype == 8:  # Note off
-        midinote += globaltranspose
-        if midinote in playingnotes:
-            for n in playingnotes[midinote]:
-                if sustain:
-                    sustainplayingnotes.append(n)
-                else:
-                    n.fadeout(50)
-            playingnotes[midinote] = []
+        if messagetype == 9 and velocity == 0:
+            messagetype = 8
 
-    elif messagetype == 12:  # Program change
-        print('Program change ' + str(note))
-        preset = note
-        LoadSamples()
+        if messagetype == 9:    # Note on
+            midinote += globaltranspose
+            try:
+                playingnotes.setdefault(midinote, []).append(samples[midinote, velocity].play(midinote))
+            except:
+                pass
 
-    elif (messagetype == 11) and (note == 64) and (velocity < 64):  # sustain pedal off
-        for n in sustainplayingnotes:
-            n.fadeout(50)
-        sustainplayingnotes = []
-        sustain = False
+        elif messagetype == 8:  # Note off
+            midinote += globaltranspose
+            if midinote in playingnotes:
+                for n in playingnotes[midinote]:
+                    if sustain:
+                        sustainplayingnotes.append(n)
+                    else:
+                        n.fadeout(50)
+                playingnotes[midinote] = []
 
-    elif (messagetype == 11) and (note == 64) and (velocity >= 64):  # sustain pedal on
-        sustain = True
+        elif messagetype == 12:  # Program change
+            print('Program change ' + str(note))
+            preset = note
+            LoadSamples()
+
+        elif (messagetype == 11) and (note == 64) and (velocity < 64):  # sustain pedal off
+            for n in sustainplayingnotes:
+                n.fadeout(50)
+            sustainplayingnotes = []
+            sustain = False
+
+        elif (messagetype == 11) and (note == 64) and (velocity >= 64):  # sustain pedal on
+            sustain = True
 
 
 #########################################
@@ -371,6 +377,8 @@ except:
 
 if USE_BUTTONS:
 
+    lastbuttontime = 0
+
     if OPIZ:
         import OPi.GPIO as GPIO
         GPIO.setmode(GPIO.SUNXI)
@@ -410,6 +418,52 @@ if USE_BUTTONS:
     ButtonsThread = threading.Thread(target=Buttons)
     ButtonsThread.daemon = True
     ButtonsThread.start()
+
+
+#########################################
+# ENCODER THREAD (ORANGE PI GPIO)
+#
+#########################################
+if USE_ENC:
+
+    import OPi.GPIO as GPIO
+    GPIO.setmode(GPIO.SUNXI)
+    GPIO.setwarnings(False)
+
+    GPIO.setup(encA, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+    GPIO.setup(encB, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+
+    updateReq = False
+    oldPreset = 0
+
+    def EncoderCallback(channel):
+        global preset
+        global oldPreset
+        global updateReq
+        if not GPIO.input(encB) and preset < 127:
+            preset +=1
+        elif preset > 0:
+            preset -=1
+        else:
+            pass
+        if oldPreset != preset:
+            updateReq = True
+            oldPreset = preset
+
+    def BankUpdate():
+        global updateReq
+        while True:
+            if updateReq:
+                LoadSamples()
+                updateReq = False
+
+            time.sleep(0.050)
+
+    GPIO.add_event_detect(encA, GPIO.FALLING  , callback=EncoderCallback, bouncetime=300)
+
+    BankUpdThread = threading.Thread(target=BankUpdate)
+    BankUpdThread.daemon = True
+    BankUpdThread.start()
 
 
 #########################################
@@ -503,7 +557,6 @@ if USE_SERIALPORT_MIDI:
 
 preset = 0
 LoadSamples()
-
 
 #########################################
 # MIDI DEVICES DETECTION
